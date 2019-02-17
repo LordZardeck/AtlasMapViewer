@@ -5,7 +5,7 @@
     "StaticDir": "./www",
     "FetchRateInSeconds": 30,
     "DisableCommands": true,
-    "RedisAddress": "127.0.0.1:6379",
-    "RedisPassword": "foobared",
+    "RedisAddress": "lettersofmarque.gg:6379",
+    "RedisPassword": "ueoMx6",
     "RedisDB": 0
 }

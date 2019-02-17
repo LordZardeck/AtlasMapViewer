@@ -1,6 +1,6 @@
 const config = {
-    ServersX: 15,
-    ServersY: 15,
+    ServersX: 8,
+    ServersY: 8,
     Suggestions: [
         "spawnshipfast name",
         "spawnbed name",

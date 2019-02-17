@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
@@ -8,6 +9,7 @@ import (
 	"log"
 	"math/rand"
 	"net/http"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -50,6 +52,11 @@ type ServerLocation struct {
 	ServerID                [2]uint16
 	ServerXRelativeLocation float64
 	ServerYRelativeLocation float64
+}
+
+type TribeDataResponse struct {
+	TribeName string
+	Color     string
 }
 
 var gameData map[string]EntityInfo
@@ -281,21 +288,59 @@ func getTerritoryURL(w http.ResponseWriter, r *http.Request) {
 	w.Write(js)
 }
 
-func getTribes(w http.ResponseWriter, r *http.Request) {
-	log.Println(r.Method, r.URL.Path)
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Content-Type", "application/json")
+func getTribeColors(tribeIDs []uint64) map[string]string {
+	log.Println(tribeIDs)
+	jsonBody, _ := json.Marshal(tribeIDs)
+	log.Println(string(jsonBody))
+	territoryUrl, _ := url.Parse(config.TerritoryURL)
+	response, err := http.Post(territoryUrl.Scheme+"://"+territoryUrl.Host+"/colors", "application/json", bytes.NewBuffer(jsonBody))
+
+	if err != nil {
+		fmt.Printf("The HTTP request failed with error %s\n", err)
+		return nil
+	}
+
+	data, _ := ioutil.ReadAll(response.Body)
+
+	var tribeColorMap map[string]string
+	err = json.Unmarshal(data, &tribeColorMap)
+
+	return tribeColorMap
+}
+
+func getTribes(responseWriter http.ResponseWriter, request *http.Request) {
+	log.Println(request.Method, request.URL.Path)
+	responseWriter.Header().Set("Access-Control-Allow-Origin", "*")
+	responseWriter.Header().Set("Content-Type", "application/json")
+
+	tribeIDs := make([]uint64, len(tribeData))
+
+	index := 0
+	for tribeID := range tribeData {
+		convertedTribeID, _ := strconv.ParseUint(tribeID, 10, 64)
+		tribeIDs[index] = convertedTribeID
+		index++
+	}
+
+	tribeColorMap := getTribeColors(tribeIDs)
+	tribeResponse := make(map[string]TribeDataResponse)
 
 	tribeDataLock.RLock()
-	js, err := json.Marshal(tribeData)
+
+	for tribeID, tribeName := range tribeData {
+		tribeResponse[tribeID] = TribeDataResponse{TribeName: tribeName, Color: tribeColorMap[tribeID]}
+	}
+
+	jsonResponse, err := json.Marshal(tribeResponse)
 	tribeDataLock.RUnlock()
 
 	if err != nil {
 		log.Println(err)
-		w.WriteHeader(http.StatusInternalServerError)
+		responseWriter.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	w.Write(js)
+
+	_, _ = responseWriter.Write(jsonResponse)
 }
 
 // getData returns the latest game data pulled from the backend.
